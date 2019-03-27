@@ -5,15 +5,7 @@ import gzip
 import os
 import sys
 import pickle as pkl
-
-
-
-
-
-embeddingsPath = '/home/shashwath/ldt/Li-wiki201308_filtered/word_linear/skip/500d/vectors.txt'
-
-folder = 'dataset/'
-files = [folder+'train.txt', folder+'test.txt']
+import util
 
 #Mapping of the labels to integers
 labelsMapping = {'Other':0,
@@ -26,12 +18,6 @@ labelsMapping = {'Other':0,
                  'Entity-Origin(e1,e2)':13, 'Entity-Origin(e2,e1)':14,
                  'Member-Collection(e1,e2)':15, 'Member-Collection(e2,e1)':16,
                  'Content-Container(e1,e2)':17, 'Content-Container(e2,e1)':18}
-
-
-
-
-words = {}
-maxSentenceLen = [0,0]
 
 
 distanceMapping = {'PADDING': 0, 'LowerMin': 1, 'GreaterMax': 2}
@@ -111,7 +97,17 @@ def createTensor(file, word2Idx, maxSentenceLen=100):
 
 
 
-def load_data():
+def load_data(embeddings_file, dataset_dir):
+    words = set()
+    files = [
+        os.path.join(dataset_dir, 'train.txt'),
+        os.path.join(dataset_dir, 'test.txt')
+    ]
+    maxSentenceLen = [
+        0,  # training max length
+        0   # test max length
+    ]
+
     for fileIdx in range(len(files)):
         file = files[fileIdx]
         for line in open(file):
@@ -119,51 +115,21 @@ def load_data():
 
             label = splits[0]
 
-
             sentence = splits[3]
             tokens = sentence.split(" ")
             maxSentenceLen[fileIdx] = max(maxSentenceLen[fileIdx], len(tokens))
             for token in tokens:
-                words[token.lower()] = True
+                words.add(token.lower())
 
 
     print("Max Sentence Lengths: ", maxSentenceLen)
 
     # :: Read in word embeddings ::
-    # :: Read in word embeddings ::
-    word2Idx = {}
-    wordEmbeddings = []
-
-
-    # :: Load the pre-trained embeddings file ::
-    fEmbeddings = open(embeddingsPath)
-
-    print("Load pre-trained embeddings file")
-    for line in fEmbeddings:
-        split = line.strip().split(" ")
-        if len(split) == 2:
-            continue
-        word = split[0]
-
-        if len(word2Idx) == 0: #Add padding+unknown
-            word2Idx["PADDING_TOKEN"] = len(word2Idx)
-            vector = np.zeros(len(split)-1) #Zero vector vor 'PADDING' word
-            wordEmbeddings.append(vector)
-
-            word2Idx["UNKNOWN_TOKEN"] = len(word2Idx)
-            vector = np.random.uniform(-0.25, 0.25, len(split)-1)
-            wordEmbeddings.append(vector)
-
-        if word.lower() in words:
-            vector = np.array([float(num) for num in split[1:]])
-            wordEmbeddings.append(vector)
-            word2Idx[word] = len(word2Idx)
-
-
-    wordEmbeddings = np.array(wordEmbeddings)
+    wordEmbeddings, word2Idx = util.load_embeddings_matrix(embeddings_file, words)
 
     print("Embeddings shape: ", wordEmbeddings.shape)
     print("Len words: ", len(words))
+
 
 
 
@@ -176,7 +142,3 @@ def load_data():
             'train_set': train_set, 'test_set': test_set}
 
     return data
-
-
-
-    print("Data preprocessing done!")
