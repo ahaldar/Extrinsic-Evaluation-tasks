@@ -7,6 +7,7 @@ import numpy as np
 
 import gzip
 import sys
+import os
 if (sys.version_info > (3, 0)):
     import pickle as pkl
 else: #Python 2.7 imports
@@ -19,6 +20,7 @@ from keras.regularizers import Regularizer
 from keras.preprocessing import sequence
 from keras.layers import Lambda
 from keras import backend as K
+from . import preprocess
 
 
 def wordIdxLookup(word, word_idx_map):
@@ -26,87 +28,97 @@ def wordIdxLookup(word, word_idx_map):
         return word_idx_map[word]
 
 
+if __name__ == '__main__':
+
+    batch_size = 64
+    nb_epoch = 25
+
+    (embeddings_file, dataset_dir) = sys.argv[1:3]
+    if len(sys.argv) > 4:
+        pklf = sys.argv[3]
+    else:
+        pklf = None
+
+    if pklf and os.path.exists(pklf):
+        data = pkl.load(gzip.open(pklf, 'rb'))
+    else:
+        data = preprocess.preprocess_data(embeddings_file, dataset_dir, pklf=pklf)
+
+    print("data loaded!")
 
 
-data = pkl.load(gzip.open("pkl/data.pkl.gz","rb"))
-print("data loaded!")
+    train_labels = data['train']['labels']
+    train_sentences = data['train']['sentences']
 
+    dev_labels = data['dev']['labels']
+    dev_sentences = data['dev']['sentences']
 
-train_labels = data['train']['labels']
-train_sentences = data['train']['sentences']
+    test_labels = data['test']['labels']
+    test_sentences = data['test']['sentences']
 
-dev_labels = data['dev']['labels']
-dev_sentences = data['dev']['sentences']
+    word_embeddings = data['wordEmbeddings']
 
-test_labels = data['test']['labels']
-test_sentences = data['test']['sentences']
+    # :: Find the longest sentence in our dataset ::
+    max_sentence_len = 0
+    for sentence in train_sentences + dev_sentences + test_sentences:
+        max_sentence_len = max(len(sentence), max_sentence_len)
 
-word_embeddings = data['wordEmbeddings']
-
-# :: Find the longest sentence in our dataset ::
-max_sentence_len = 0
-for sentence in train_sentences + dev_sentences + test_sentences:
-    max_sentence_len = max(len(sentence), max_sentence_len)
-
-print("Longest sentence: %d" % max_sentence_len)
-
-
-
-y_train = np.array(train_labels)
-y_dev = np.array(dev_labels)
-y_test = np.array(test_labels)
-
-X_train = sequence.pad_sequences(train_sentences, maxlen=max_sentence_len)
-X_dev = sequence.pad_sequences(dev_sentences, maxlen=max_sentence_len)
-X_test = sequence.pad_sequences(test_sentences, maxlen=max_sentence_len)
-
-
-print('X_train shape:', X_train.shape)
-print('X_dev shape:', X_dev.shape)
-print('X_test shape:', X_test.shape)
-print('y_train shape:', y_train.shape)
+    print("Longest sentence: %d" % max_sentence_len)
 
 
 
-#  :: Create the network ::
+    y_train = np.array(train_labels)
+    y_dev = np.array(dev_labels)
+    y_test = np.array(test_labels)
 
-print('Build model...')
-
-# set parameters:
-batch_size = 64
-nb_epoch = 25
-
-
-
-words_input = Input(shape=(max_sentence_len,), dtype='int32', name='words_input')
-
-#Our word embedding layer
-wordsEmbeddingLayer = Embedding(word_embeddings.shape[0],
-                    word_embeddings.shape[1],
-                    weights=[word_embeddings],
-                    trainable=False)
-
-words = wordsEmbeddingLayer(words_input)
-
-output = Lambda(lambda xin: K.sum(xin, axis=1))(words)
+    X_train = sequence.pad_sequences(train_sentences, maxlen=max_sentence_len)
+    X_dev = sequence.pad_sequences(dev_sentences, maxlen=max_sentence_len)
+    X_test = sequence.pad_sequences(test_sentences, maxlen=max_sentence_len)
 
 
-# We project onto a single unit output layer, and squash it with a sigmoid:
-output = Dense(1, activation='sigmoid')(output)
+    print('X_train shape:', X_train.shape)
+    print('X_dev shape:', X_dev.shape)
+    print('X_test shape:', X_test.shape)
+    print('y_train shape:', y_train.shape)
 
-model = Model(inputs=[words_input], outputs=[output])
 
-#model.summary()
-dev_acc = []
-test_acc = []
 
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-model.summary()
-model.fit(X_train, y_train, batch_size=batch_size, epochs=nb_epoch, verbose=1,validation_data=(X_dev, y_dev))
+    #  :: Create the network ::
 
-#Use Keras to compute the loss and the accuracy
-dev_loss, dev_accuracy = model.evaluate(X_dev, y_dev, verbose=False)
-test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=False)
+    print('Build model...')
 
-print("Dev-Accuracy: %.2f" % (dev_accuracy*100))
-print("Test-Accuracy: %.2f)" % (test_accuracy*100))
+
+
+
+    words_input = Input(shape=(max_sentence_len,), dtype='int32', name='words_input')
+
+    #Our word embedding layer
+    wordsEmbeddingLayer = Embedding(word_embeddings.shape[0],
+                        word_embeddings.shape[1],
+                        weights=[word_embeddings],
+                        trainable=False)
+
+    words = wordsEmbeddingLayer(words_input)
+
+    output = Lambda(lambda xin: K.sum(xin, axis=1))(words)
+
+
+    # We project onto a single unit output layer, and squash it with a sigmoid:
+    output = Dense(1, activation='sigmoid')(output)
+
+    model = Model(inputs=[words_input], outputs=[output])
+
+    #model.summary()
+    dev_acc = []
+    test_acc = []
+
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    model.summary()
+    model.fit(X_train, y_train, batch_size=batch_size, epochs=nb_epoch, verbose=1,validation_data=(X_dev, y_dev))
+
+    #Use Keras to compute the loss and the accuracy
+    dev_loss, dev_accuracy = model.evaluate(X_dev, y_dev, verbose=False)
+    test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=False)
+
+    print("Dev-Accuracy: %.2f" % (dev_accuracy*100))
+    print("Test-Accuracy: %.2f)" % (test_accuracy*100))
