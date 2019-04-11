@@ -42,7 +42,9 @@ Bib entry for Whitaker et al (2019):
 
 ## Old README
 
-For each task, run `preprocess.py` to load the preprocessed version of the dataset.
+To run all tasks, execute `run_tasks.sh`.
+
+For each individual task, `preprocess.py` (where present) will load the preprocessed version of the dataset.
 To train the model, run `train.py`
 
 A pretrained word embedding text file is needed where every line has a word string followed by a space and the embedding vector.
@@ -50,4 +52,10 @@ For example, `acrobat 0.6056159735 -0.1367940009 -0.0936380029 0.8406270146 0.26
 
 Data for NLI task can be found [here](https://nlp.stanford.edu/projects/snli/snli_1.0.zip)
 
-For the sequence labeling tasks(POS, NER and chunking), please refer to [this repo](https://github.com/shashwath94/Sequence-Labeling)
+For sequence labeling tasks (POS, NER and chunking), please refer to [this repo](https://github.com/shashwath94/Sequence-Labeling)
+
+## Dependencies
+
+- Numpy
+- Keras
+- _Keras backend; default Tensorflow_
